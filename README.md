@@ -242,24 +242,17 @@ Setup, deployment, pricing and architecture documentation lives in [`docs/`](doc
 
 ## Screenshots
 
-<!--
-Add screenshots here, taken against a SEEDED LOCAL database — never the live
-cafe. No real customer names, mobile numbers, Aadhaar numbers or takings.
-
 | Stations board | Live session |
 | --- | --- |
-| ![Stations](docs/screenshots/stations.png) | ![Session](docs/screenshots/session.png) |
+| ![Stations board](docs/screenshots/stations.png) | ![Live session](docs/screenshots/session.png) |
 
-| Checkout | Reports |
+| Checkout | Pricing configuration |
 | --- | --- |
-| ![Checkout](docs/screenshots/checkout.png) | ![Reports](docs/screenshots/reports.png) |
--->
-
-*Coming shortly.*
+| ![Checkout](docs/screenshots/checkout.png) | ![Pricing configuration](docs/screenshots/pricing.png) |
 
 ---
-
 ## Status
 
 In production since 2026, running a working cafe. Features and fixes are driven
 by the owner using the system on the floor.
+
