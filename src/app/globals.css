@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   GENZ GAMING CAFE — design tokens
+   Dark, high-contrast, golden-yellow accented. Gold is reserved for state and
+   emphasis (active nav, primary actions, key numbers) so it keeps its meaning.
+   ========================================================================== */
+
+@theme {
+  --color-canvas: #080808;
+  --color-surface: #111111;
+  --color-surface-2: #181818;
+  --color-surface-3: #202020;
+  --color-line: #262626;
+  --color-line-strong: #383838;
+
+  --color-gold: #f5c518;
+  --color-gold-bright: #ffd633;
+  --color-gold-dim: #b8940f;
+  /* Second brand stop — the warm amber the logo fades into. */
+  --color-gold-warm: #ff9d00;
+
+  --color-ink: #ffffff;
+  --color-ink-muted: #a1a1aa;
+  --color-ink-faint: #71717a;
+
+  --color-ok: #22c55e;
+  --color-busy: #f5c518;
+  --color-info: #3b82f6;
+  --color-warn: #f97316;
+  --color-danger: #ef4444;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+  --radius-card: 0.75rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  /* Visible, gold focus ring everywhere — required for keyboard operation. */
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-gold);
+    color: #000;
+  }
+
+  /* Numbers in the UI should never shift width as they tick. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 999px;
+  }
+}
+
+/* Fast, restrained motion. Respects reduced-motion preferences. */
+@keyframes genz-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes genz-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.animate-fade-in {
+  animation: genz-fade-in 140ms ease-out;
+}
+
+.animate-live {
+  animation: genz-pulse-dot 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Receipt printing: hide the app chrome, print on 80mm thermal paper. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .receipt-sheet {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    background: #fff !important;
+    color: #000 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .receipt-sheet * {
+    color: #000 !important;
+    border-color: #999 !important;
+    background: transparent !important;
+  }
+}
+
+@page {
+  margin: 6mm;
+}

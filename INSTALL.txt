@@ -1,0 +1,88 @@
+GENZ GAMING CAFE — update bundle
+=================================
+
+WHAT'S NEW: MEMBER PRICES FOR FOOD
+----------------------------------
+Food can now have a member price, just like gaming does, and it applies by
+itself when a member is on the station.
+
+SETTING YOUR MEMBER PRICES
+--------------------------
+Food Menu > Edit on any item. There is a new box:
+
+    Member price (Rs)     [ leave blank if members pay the same ]
+
+Fill it in only where members pay less. Leave it blank on everything else
+and those items simply cost what they always did — you do not need to touch
+every item on the menu.
+
+The menu screen shows both prices, so you can see at a glance which items
+have a member deal:
+
+    Burger          Rs 150
+                    Rs 130 member
+
+HOW IT WORKS AT THE COUNTER
+---------------------------
+Nothing to remember and nothing extra to tap.
+
+When you start a session and add a member to the station, the Add food
+screen for that station switches to member prices on its own. You will see
+a green line at the top saying so, and every item with a member deal shows
+the old price crossed out next to the member price:
+
+    Coke        Rs 60  Rs 50        [ + Add ]
+    Cold Coffee Rs 90  Rs 75        [ + Add ]
+    Water       Rs 20               [ + Add ]     (no member deal — same price)
+
+THE RULE FOR A SHARED PS5
+-------------------------
+If ANY of the players on that station is a member, the whole food order is
+at member prices. That is what you chose, and it means a table of four with
+one member is never an argument at the counter.
+
+A FEW THINGS THAT ARE HANDLED FOR YOU
+-------------------------------------
+  * The price is decided by the system, on the server, from who is actually
+    sitting at that station — not from anything the screen sends. Staff
+    cannot get it wrong by accident.
+
+  * The price is recorded onto the order the moment it is placed. If you
+    change your menu prices next month, last month's bills do not move.
+
+  * A member price higher than the normal price is refused as a typo.
+
+  * An item with no member price is charged the same to everybody, always.
+
+HOW TO INSTALL
+--------------
+1. Unzip this file.
+
+2. Copy everything inside it into your genz-gaming-cafe folder, replacing
+   the files when Windows asks. (Do NOT copy INSTALL.txt itself.)
+
+3. Open PowerShell in that folder and run, one at a time:
+
+       npm run db:migrate
+       npx vercel --prod
+
+4. Go to Food Menu and fill in the member prices where you offer them.
+
+Nothing changes for your existing menu until you do step 4 — every item
+starts with no member price, meaning everyone pays the same as today.
+
+ALSO IN THIS BUNDLE
+-------------------
+Everything from the earlier updates: import members from a sheet,
+per-minute billing, logo upload in Settings, the membership renewal fix,
+multiplayer sessions, delete stations, delete voided bills, station colour
+schemes.
+
+CHECKED BEFORE SENDING
+----------------------
+Applied to a clean copy of your current version and built and tested:
+production build passed, 184 unit tests passed, 14 browser tests passed on
+desktop and mobile. The food pricing has its own tests against a real
+database covering a mixed table with one member, a table with none, an item
+with no member deal, and the database refusing a member price above the
+normal one.
