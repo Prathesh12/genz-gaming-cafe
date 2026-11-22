@@ -33,9 +33,10 @@ export function Badge({ className, tone, ...props }: BadgeProps) {
  */
 const STATION_STATUS: Record<string, { label: string; tone: BadgeProps["tone"]; glyph: string }> = {
   AVAILABLE: { label: "Available", tone: "ok", glyph: "●" },
-  OCCUPIED: { label: "Occupied", tone: "gold", glyph: "▶" },
+  OCCUPIED: { label: "Playing", tone: "gold", glyph: "▶" },
+  PAUSED: { label: "Paused", tone: "warn", glyph: "Ⅱ" },
   RESERVED: { label: "Reserved", tone: "info", glyph: "◆" },
-  MAINTENANCE: { label: "Maintenance", tone: "warn", glyph: "▲" },
+  MAINTENANCE: { label: "Out of service", tone: "warn", glyph: "▲" },
 };
 
 export function StationStatusBadge({ status, className }: { status: string; className?: string }) {

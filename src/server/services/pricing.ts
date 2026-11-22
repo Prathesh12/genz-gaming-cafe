@@ -7,8 +7,10 @@ import { pricingRules, stationCategories } from "@/db/schema";
 import type { BusinessSettings } from "@/db/schema";
 import {
   hourlyDisplayRate,
+  priceRoomSession,
   priceSession,
   priceSessionForPlayers,
+  roomHourlyDisplayRate,
   type EnginePlayer,
   type EnginePricingRule,
   type PauseInterval,
@@ -26,6 +28,7 @@ export type PricingRuleRow = {
   kind: "SLAB" | "DAY_PASS";
   durationMinutes: number;
   price: number;
+  playerCount: number;
   isActive: boolean;
 };
 
@@ -40,6 +43,7 @@ export async function listPricingRules(client: DbClient = db): Promise<PricingRu
       kind: pricingRules.kind,
       durationMinutes: pricingRules.durationMinutes,
       price: pricingRules.price,
+      playerCount: pricingRules.playerCount,
       isActive: pricingRules.isActive,
     })
     .from(pricingRules)
@@ -50,6 +54,7 @@ export async function listPricingRules(client: DbClient = db): Promise<PricingRu
       asc(pricingRules.customerType),
       asc(pricingRules.timeBand),
       asc(pricingRules.durationMinutes),
+      asc(pricingRules.playerCount),
     );
   return rows;
 }
@@ -65,6 +70,7 @@ export async function getRulesByCategory(client: DbClient = db): Promise<Map<str
       kind: pricingRules.kind,
       durationMinutes: pricingRules.durationMinutes,
       price: pricingRules.price,
+      playerCount: pricingRules.playerCount,
     })
     .from(pricingRules)
     .where(eq(pricingRules.isActive, true));
@@ -79,6 +85,7 @@ export async function getRulesByCategory(client: DbClient = db): Promise<Map<str
       kind: row.kind,
       durationMinutes: row.durationMinutes,
       price: row.price,
+      playerCount: row.playerCount,
     });
     map.set(row.categoryId, list);
   }
@@ -130,6 +137,23 @@ export function computeGroupGamingCharge(input: GroupChargeInput): PriceSessionP
   });
 }
 
+export type RoomChargeInput = Omit<ChargeInput, "customerType" | "membershipValidUntil"> & {
+  playerCount: number;
+};
+
+/** Price a PlayStation room once, never once per player. */
+export function computeRoomGamingCharge(input: RoomChargeInput): PriceSessionResult {
+  return priceRoomSession({
+    startedAt: input.startedAt,
+    endedAt: input.endedAt,
+    pauses: input.pauses,
+    rules: input.rules,
+    config: toPricingConfig(input.settings),
+    forceDayPass: input.forceDayPass,
+    playerCount: input.playerCount,
+  });
+}
+
 export function displayHourlyRate(
   rules: EnginePricingRule[],
   settings: BusinessSettings,
@@ -137,4 +161,13 @@ export function displayHourlyRate(
   at: Date = new Date(),
 ): number | null {
   return hourlyDisplayRate(rules, toPricingConfig(settings), customerType, at);
+}
+
+export function displayRoomHourlyRate(
+  rules: EnginePricingRule[],
+  settings: BusinessSettings,
+  playerCount: number,
+  at: Date = new Date(),
+): number | null {
+  return roomHourlyDisplayRate(rules, toPricingConfig(settings), playerCount, at);
 }

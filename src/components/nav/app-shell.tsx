@@ -95,7 +95,7 @@ export function AppShell({
             <Menu className="size-5" />
           </button>
           <h1 className="truncate text-sm font-bold tracking-wider text-ink uppercase">
-            {current?.label ?? "GENZ Gaming Cafe"}
+            {current?.label ?? cafeName}
           </h1>
           <div className="ml-auto flex items-center gap-3">
             <Clock />

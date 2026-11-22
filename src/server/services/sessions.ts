@@ -21,8 +21,14 @@ import type { SessionUser } from "@/lib/auth";
 import { sessionCode } from "@/lib/codes";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { activeCoverage } from "@/lib/memberships";
-import type { EnginePlayer, PauseInterval } from "@/server/pricing/engine";
-import { computeGroupGamingCharge, getRulesByCategory } from "@/server/services/pricing";
+import type {
+  EnginePlayer,
+  EnginePricingRule,
+  PauseInterval,
+  PriceSessionPlayersResult,
+  RoomPricingSnapshot,
+} from "@/server/pricing/engine";
+import { computeGroupGamingCharge, computeRoomGamingCharge, getRulesByCategory } from "@/server/services/pricing";
 import { getSettingsFor } from "@/server/services/settings";
 
 /** One seat on the station: a member, or a guest paying regular rates. */
@@ -168,7 +174,12 @@ export async function startSession(input: StartSessionInput, user: SessionUser) 
         : [{ memberId: input.memberId, name: input.customerName }];
 
     const [category] = await tx
-      .select({ maxPlayers: stationCategories.maxPlayers, name: stationCategories.name })
+      .select({
+        maxPlayers: stationCategories.maxPlayers,
+        name: stationCategories.name,
+        pricingModel: stationCategories.pricingModel,
+        playstationType: stationCategories.playstationType,
+      })
       .from(stationCategories)
       .where(eq(stationCategories.id, station.categoryId))
       .limit(1);
@@ -180,8 +191,30 @@ export async function startSession(input: StartSessionInput, user: SessionUser) 
       );
     }
 
+    if (category?.pricingModel === "ROOM" && (requested.length < 1 || requested.length > 4)) {
+      throw new ValidationError("A PlayStation room session requires between 1 and 4 players.");
+    }
+
     const roster = await resolvePlayers(tx, requested, startedAt);
     const primary = roster[0];
+    let pricingSnapshot: RoomPricingSnapshot | null = null;
+
+    if (category?.pricingModel === "ROOM") {
+      const rules = (await getRulesByCategory(tx)).get(station.categoryId) ?? [];
+      const applicableRules = rules
+        .filter((rule) => (rule.playerCount ?? 1) === roster.length)
+        .map((rule) => ({ ...rule }));
+      const settings = await getSettingsFor(tx);
+      computeRoomGamingCharge({
+        startedAt,
+        endedAt: new Date(startedAt.getTime() + 60 * 60_000),
+        pauses: [],
+        playerCount: roster.length,
+        rules: applicableRules,
+        settings,
+      });
+      pricingSnapshot = { pricingModel: "ROOM", playerCount: roster.length, rules: applicableRules };
+    }
 
     const [session] = await tx
       .insert(gameSessions)
@@ -196,6 +229,8 @@ export async function startSession(input: StartSessionInput, user: SessionUser) 
         customerMobile: input.customerMobile ?? primary.mobile,
         customerType: primary.customerType,
         playerCount: roster.length,
+        pricingModel: category?.pricingModel ?? "PER_PLAYER",
+        pricingSnapshot,
         status: "ACTIVE",
         startedAt,
         plannedMinutes: input.plannedMinutes,
@@ -266,6 +301,9 @@ export async function setSessionPlayers(
     if (!session) throw new NotFoundError("Session not found.");
     if (session.status === "COMPLETED") throw new ConflictError("This session has already been paid for.");
     if (session.status === "CANCELLED") throw new ConflictError("This session was cancelled.");
+    if (session.pricingModel === "ROOM") {
+      throw new ConflictError("Player count is locked for a PlayStation room session. Start a new session to change it.");
+    }
     if (players.length === 0) throw new ValidationError("A session needs at least one player.");
 
     const [row] = await tx
@@ -560,6 +598,7 @@ export type SessionBill = {
     membershipValidUntil: Date | null;
     plannedMinutes: number | null;
     playerCount: number;
+    pricingModel: "PER_PLAYER" | "ROOM";
   };
   station: {
     id: string;
@@ -568,6 +607,7 @@ export type SessionBill = {
     categoryId: string;
     categoryName: string;
     maxPlayers: number;
+    playstationType: "PS4" | "PS5" | null;
   };
   /** Everyone on the station, with each player's own share of the gaming charge. */
   players: {
@@ -578,7 +618,7 @@ export type SessionBill = {
     customerType: "REGULAR" | "MEMBER";
     amount: number;
   }[];
-  gaming: ReturnType<typeof computeGroupGamingCharge>;
+  gaming: PriceSessionPlayersResult;
   food: {
     lines: {
       orderId: string;
@@ -620,6 +660,7 @@ export async function getSessionBill(
       },
       categoryName: stationCategories.name,
       maxPlayers: stationCategories.maxPlayers,
+      playstationType: stationCategories.playstationType,
       memberName: members.fullName,
       memberCode: members.memberCode,
       membershipValidUntil: memberships.endDate,
@@ -657,7 +698,7 @@ export async function getSessionBill(
     .orderBy(asc(foodOrders.createdAt));
 
   const rulesByCategory = await getRulesByCategory(client);
-  const rules = rulesByCategory.get(row.station.categoryId) ?? [];
+  const liveRules = rulesByCategory.get(row.station.categoryId) ?? [];
 
   const billingEndsAt = row.session.endedAt ?? new Date();
   const pauseIntervals: PauseInterval[] = pauses.map((p) => ({ pausedAt: p.pausedAt, resumedAt: p.resumedAt }));
@@ -688,15 +729,24 @@ export async function getSessionBill(
     membershipValidUntil: player.membershipValidUntil,
   }));
 
-  const gaming = computeGroupGamingCharge({
-    startedAt: row.session.startedAt,
-    endedAt: billingEndsAt,
-    pauses: pauseIntervals,
-    players: enginePlayers,
-    rules,
-    settings,
-    forceDayPass,
-  });
+  const gaming = row.session.pricingModel === "ROOM"
+    ? priceRoomFromSnapshot(row.session.pricingSnapshot, {
+        startedAt: row.session.startedAt,
+        endedAt: billingEndsAt,
+        pauses: pauseIntervals,
+        players: enginePlayers,
+        settings,
+        forceDayPass,
+      })
+    : computeGroupGamingCharge({
+        startedAt: row.session.startedAt,
+        endedAt: billingEndsAt,
+        pauses: pauseIntervals,
+        players: enginePlayers,
+        rules: liveRules,
+        settings,
+        forceDayPass,
+      });
 
   const foodAmount = foodRows.reduce((sum, line) => sum + line.lineTotal, 0);
   const foodTax = settings.taxEnabled ? foodRows.reduce((sum, line) => sum + line.taxAmount, 0) : 0;
@@ -717,8 +767,14 @@ export async function getSessionBill(
       membershipValidUntil: row.membershipValidUntil ?? null,
       plannedMinutes: row.session.plannedMinutes,
       playerCount: gaming.playerCount,
+      pricingModel: row.session.pricingModel,
     },
-    station: { ...row.station, categoryName: row.categoryName, maxPlayers: row.maxPlayers },
+    station: {
+      ...row.station,
+      categoryName: row.categoryName,
+      maxPlayers: row.maxPlayers,
+      playstationType: row.playstationType,
+    },
     players: gaming.players.map((player) => {
       const source = roster.find((entry) => entry.slot === player.slot);
       return {
@@ -736,4 +792,55 @@ export async function getSessionBill(
     taxEnabled: settings.taxEnabled,
     currencySymbol: settings.currencySymbol,
   };
+}
+
+function priceRoomFromSnapshot(
+  value: unknown,
+  input: {
+    startedAt: Date;
+    endedAt: Date;
+    pauses: PauseInterval[];
+    players: EnginePlayer[];
+    settings: Awaited<ReturnType<typeof getSettingsFor>>;
+    forceDayPass: boolean;
+  },
+): PriceSessionPlayersResult {
+  const snapshot = value as Partial<RoomPricingSnapshot> | null;
+  if (
+    !snapshot ||
+    snapshot.pricingModel !== "ROOM" ||
+    !Number.isInteger(snapshot.playerCount) ||
+    !Array.isArray(snapshot.rules)
+  ) {
+    throw new ValidationError("This room session has no valid pricing snapshot. Cancel it and start a new session.");
+  }
+
+  const rules = snapshot.rules as EnginePricingRule[];
+  const room = computeRoomGamingCharge({
+    startedAt: input.startedAt,
+    endedAt: input.endedAt,
+    pauses: input.pauses,
+    playerCount: snapshot.playerCount as number,
+    rules,
+    settings: input.settings,
+    forceDayPass: input.forceDayPass,
+  });
+  const count = snapshot.playerCount as number;
+  const base = Math.floor(room.amount / count);
+  let remainder = room.amount - base * count;
+  const players = Array.from({ length: count }, (_, index) => {
+    const amount = base + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder -= 1;
+    const player = input.players[index];
+    return {
+      slot: index + 1,
+      label: player?.label ?? `Player ${index + 1}`,
+      customerType: player?.customerType ?? "REGULAR" as const,
+      amount,
+      segments: room.segments,
+      dayPassApplied: room.dayPassApplied,
+    };
+  });
+
+  return { ...room, playerCount: count, players };
 }

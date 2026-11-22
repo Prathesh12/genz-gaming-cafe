@@ -34,7 +34,7 @@ export function LoginForm() {
               inputMode="email"
               autoFocus
               required
-              placeholder="you@genzcafe.in"
+              placeholder="you@drgames.com"
             />
           </Field>
 

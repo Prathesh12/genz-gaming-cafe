@@ -18,7 +18,7 @@ import {
   type StationStatus,
 } from "@/db/schema";
 import { parseHHmm } from "@/lib/time";
-import { hourlyDisplayRate, type EnginePricingRule, type PricingConfig } from "@/server/pricing/engine";
+import { hourlyDisplayRate, roomHourlyDisplayRate, type EnginePricingRule, type PricingConfig, type RoomPricingSnapshot } from "@/server/pricing/engine";
 import { getRulesByCategory } from "@/server/services/pricing";
 import { getSettings } from "@/server/services/settings";
 
@@ -62,6 +62,8 @@ export type BoardSession = {
   membershipValidUntil: string | null;
   plannedMinutes: number | null;
   playerCount: number;
+  pricingModel: "PER_PLAYER" | "ROOM";
+  pricingSnapshot: RoomPricingSnapshot | null;
   /** Everyone on the station. Always at least one entry. */
   players: BoardPlayer[];
   pauses: BoardPause[];
@@ -77,6 +79,8 @@ export type BoardStation = {
   name: string;
   categoryId: string;
   categoryName: string;
+  pricingModel: "PER_PLAYER" | "ROOM";
+  playstationType: "PS4" | "PS5" | null;
   color: string;
   colorStyle: "SOLID" | "GRADIENT";
   colorAccent: string;
@@ -87,6 +91,7 @@ export type BoardStation = {
   description: string | null;
   hourlyRate: number | null;
   memberHourlyRate: number | null;
+  roomHourlyRates: Record<number, number | null>;
   session: BoardSession | null;
   upcomingReservation: { id: string; customerName: string; startTime: string; endTime: string } | null;
 };
@@ -96,6 +101,8 @@ export type BoardCategory = {
   name: string;
   color: string;
   maxPlayers: number;
+  pricingModel: "PER_PLAYER" | "ROOM";
+  playstationType: "PS4" | "PS5" | null;
   rules: EnginePricingRule[];
 };
 
@@ -129,6 +136,8 @@ export async function listStations(includeInactive = false, client: DbClient = d
       categoryId: stations.categoryId,
       categoryName: stationCategories.name,
       maxPlayers: stationCategories.maxPlayers,
+      pricingModel: stationCategories.pricingModel,
+      playstationType: stationCategories.playstationType,
       color: stations.color,
       colorStyle: stations.colorStyle,
       colorAccent: stations.colorAccent,
@@ -178,6 +187,8 @@ export async function getStationBoard(client: DbClient = db): Promise<StationBoa
       membershipValidUntil: memberships.endDate,
       plannedMinutes: gameSessions.plannedMinutes,
       playerCount: gameSessions.playerCount,
+      pricingModel: gameSessions.pricingModel,
+      pricingSnapshot: gameSessions.pricingSnapshot,
       // Joined rather than fetched with a correlated raw-SQL subquery: column
       // names interpolated into `sql` render unqualified and can bind to the
       // wrong table.
@@ -303,6 +314,8 @@ export async function getStationBoard(client: DbClient = db): Promise<StationBoa
       membershipValidUntil: session.membershipValidUntil?.toISOString() ?? null,
       plannedMinutes: session.plannedMinutes,
       playerCount: session.playerCount,
+      pricingModel: session.pricingModel,
+      pricingSnapshot: session.pricingSnapshot as RoomPricingSnapshot | null,
       players: playersBySession.get(session.id) ?? [
         {
           slot: 1,
@@ -350,6 +363,8 @@ export async function getStationBoard(client: DbClient = db): Promise<StationBoa
       name: station.name,
       categoryId: station.categoryId,
       categoryName: station.categoryName,
+      pricingModel: station.pricingModel,
+      playstationType: station.playstationType,
       color: station.color,
       colorStyle: station.colorStyle,
       colorAccent: station.colorAccent,
@@ -357,8 +372,15 @@ export async function getStationBoard(client: DbClient = db): Promise<StationBoa
       status: station.status,
       maintenanceReason: station.maintenanceReason,
       description: station.description,
-      hourlyRate: hourlyDisplayRate(rules, pricingConfig, "REGULAR", now),
-      memberHourlyRate: hourlyDisplayRate(rules, pricingConfig, "MEMBER", now),
+      hourlyRate:
+        station.pricingModel === "ROOM"
+          ? roomHourlyDisplayRate(rules, pricingConfig, 1, now)
+          : hourlyDisplayRate(rules, pricingConfig, "REGULAR", now),
+      memberHourlyRate:
+        station.pricingModel === "ROOM" ? null : hourlyDisplayRate(rules, pricingConfig, "MEMBER", now),
+      roomHourlyRates: Object.fromEntries(
+        [1, 2, 3, 4].map((count) => [count, roomHourlyDisplayRate(rules, pricingConfig, count, now)]),
+      ),
       session: sessionByStation.get(station.id) ?? null,
       upcomingReservation: reservationByStation.get(station.id) ?? null,
     };
@@ -371,6 +393,8 @@ export async function getStationBoard(client: DbClient = db): Promise<StationBoa
       name: category.name,
       color: category.color,
       maxPlayers: category.maxPlayers,
+      pricingModel: category.pricingModel,
+      playstationType: category.playstationType,
       rules: rulesByCategory.get(category.id) ?? [],
     })),
     pricingConfig,

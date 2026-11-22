@@ -57,14 +57,16 @@ const db = drizzle(pool, { schema, casing: "snake_case" });
 const rupees = (value: number) => Math.round(value * 100);
 
 async function main() {
-  console.log("Seeding GENZ Gaming Cafe…");
+  console.log("Seeding Dr. Games…");
 
   /* ------------------------------- Settings ------------------------------- */
   await db
     .insert(businessSettings)
     .values({
       id: 1,
-      cafeName: "GENZ GAMING CAFE",
+      cafeName: "Dr. Games",
+      currencySymbol: "EGP",
+      invoicePrefix: "DG",
       address: "2nd Floor, MG Road, Bengaluru 560001",
       phone: "+91 98765 43210",
       nightStart: "23:00",

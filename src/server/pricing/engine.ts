@@ -52,6 +52,8 @@ export type EnginePricingRule = {
   timeBand: PricingTimeBand;
   kind: PricingRuleKind;
   durationMinutes: number;
+  /** Player count selected by a ROOM rule. Legacy rules default to one. */
+  playerCount?: number;
   /** Minor units (paise). */
   price: number;
 };
@@ -143,6 +145,48 @@ export class PricingError extends Error {
     super(message);
     this.name = "PricingError";
   }
+}
+
+export type RoomPricingSnapshot = {
+  pricingModel: "ROOM";
+  playerCount: number;
+  rules: EnginePricingRule[];
+};
+
+export type PriceRoomSessionInput = Omit<PriceSessionInput, "customerType" | "membershipValidUntil"> & {
+  /** Total people using the room. Room prices are never multiplied by this. */
+  playerCount: number;
+};
+
+/**
+ * Price a PlayStation room once at the rule configured for its player count.
+ * The legacy multi-player function intentionally remains separate because it
+ * prices each person; routing ROOM sessions through it would multiply revenue.
+ */
+export function priceRoomSession(input: PriceRoomSessionInput): PriceSessionResult {
+  if (!Number.isInteger(input.playerCount) || input.playerCount < 1 || input.playerCount > 4) {
+    throw new PricingError("A PlayStation room session requires between 1 and 4 players.");
+  }
+
+  const rules = input.rules.filter((rule) => (rule.playerCount ?? 1) === input.playerCount);
+  if (!rules.some((rule) => rule.kind === "SLAB")) {
+    throw new PricingError(`No room pricing is configured for ${input.playerCount} players.`);
+  }
+
+  const result = priceSession({
+    startedAt: input.startedAt,
+    endedAt: input.endedAt,
+    pauses: input.pauses,
+    rules,
+    config: input.config,
+    customerType: "REGULAR",
+    forceDayPass: input.forceDayPass,
+  });
+
+  return {
+    ...result,
+    notes: [`Total room price for ${input.playerCount} player${input.playerCount === 1 ? "" : "s"}.`, ...result.notes],
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -718,7 +762,7 @@ export function priceSessionForPlayers(input: PriceSessionPlayersInput): PriceSe
 }
 
 /**
- * The headline "₹X/hr" shown on a station card: the cost of exactly one hour
+ * The headline hourly amount shown on a room card: the cost of exactly one hour
  * for the given customer type in the band that applies right now.
  */
 export function hourlyDisplayRate(
@@ -738,4 +782,16 @@ export function hourlyDisplayRate(
   } catch {
     return null;
   }
+}
+
+/** Total room price for exactly one hour at the selected player count. */
+export function roomHourlyDisplayRate(
+  rules: EnginePricingRule[],
+  config: PricingConfig,
+  playerCount: number,
+  at: Date = new Date(),
+): number | null {
+  if (!Number.isInteger(playerCount) || playerCount < 1 || playerCount > 4) return null;
+  const matching = rules.filter((rule) => (rule.playerCount ?? 1) === playerCount);
+  return hourlyDisplayRate(matching, config, "REGULAR", at);
 }

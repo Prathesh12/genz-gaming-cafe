@@ -74,6 +74,7 @@ playwright/.cache/
 *.xls
 *.db
 *.sqlite
+*.backup
 
 tsconfig.tsbuildinfo
 *.log

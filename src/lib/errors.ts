@@ -55,7 +55,19 @@ export class ValidationError extends AppError {
   }
 }
 
-type PgError = { code?: string; constraint?: string; detail?: string };
+type PgError = { code?: string; constraint?: string; detail?: string; cause?: unknown };
+
+function postgresError(error: unknown): PgError | null {
+  let current = error;
+  const seen = new Set<unknown>();
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const candidate = current as PgError;
+    if (typeof candidate.code === "string") return candidate;
+    current = candidate.cause;
+  }
+  return null;
+}
 
 /**
  * Translate a thrown value into a message that is safe and useful for staff.
@@ -64,8 +76,8 @@ type PgError = { code?: string; constraint?: string; detail?: string };
 export function describeError(error: unknown): { message: string; code: string } {
   if (error instanceof AppError) return { message: error.message, code: error.code };
 
-  const pg = error as PgError;
-  if (pg && typeof pg === "object" && typeof pg.code === "string") {
+  const pg = postgresError(error);
+  if (pg) {
     switch (pg.code) {
       case "23505": {
         const constraint = pg.constraint ?? "";
@@ -93,7 +105,7 @@ export function describeError(error: unknown): { message: string; code: string }
         }
         if (constraint.includes("pricing_rules_unique")) {
           return {
-            message: "A pricing rule for that category, customer type, band and duration already exists.",
+            message: "A price already exists for that category, duration and player count. Edit that existing price instead.",
             code: "DUPLICATE",
           };
         }

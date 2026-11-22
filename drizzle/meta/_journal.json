@@ -50,6 +50,13 @@
       "when": 1786857005452,
       "tag": "0006_food_member_price",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795237200000,
+      "tag": "0007_playstation_room_pricing",
+      "breakpoints": true
     }
   ]
 }

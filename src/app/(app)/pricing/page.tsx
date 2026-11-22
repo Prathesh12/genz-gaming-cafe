@@ -17,7 +17,13 @@ export default async function PricingPage() {
 
   return (
     <PricingClient
-      categories={categories.map((category) => ({ id: category.id, name: category.name, color: category.color }))}
+      categories={categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        color: category.color,
+        pricingModel: category.pricingModel,
+        playstationType: category.playstationType,
+      }))}
       rules={rules}
       canManage={can(user, "pricing.manage")}
       currencySymbol={settings.currencySymbol}

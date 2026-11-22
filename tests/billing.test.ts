@@ -11,25 +11,26 @@ import { formatMoney, formatMoneyPlain, percentOf, toMajor, toMinor } from "@/li
 import { checkoutSchema, membershipSchema } from "@/lib/schemas";
 
 describe("money", () => {
-  it("converts rupees to paise and back without drift", () => {
+  it("converts EGP to piastres and back without drift", () => {
     expect(toMinor(120.5)).toBe(12050);
     expect(toMinor(0.1 + 0.2)).toBe(30);
     expect(toMajor(12050)).toBe(120.5);
   });
 
-  it("formats Indian currency", () => {
-    expect(formatMoney(30000)).toBe("₹300");
-    expect(formatMoney(30050)).toBe("₹300.50");
-    expect(formatMoney(1234567)).toBe("₹12,345.67");
-    expect(formatMoney(0)).toBe("₹0");
-    expect(formatMoney(-5000)).toBe("-₹50");
+  it("formats EGP consistently with two decimal places", () => {
+    expect(formatMoney(30000)).toBe("300.00 EGP");
+    expect(formatMoney(30050)).toBe("300.50 EGP");
+    expect(formatMoney(1234567)).toBe("12,345.67 EGP");
+    expect(formatMoney(0)).toBe("0.00 EGP");
+    expect(formatMoney(-5000)).toBe("-50.00 EGP");
+    expect(formatMoney(15000, "EGP")).toBe("150.00 EGP");
   });
 
   it("formats plain amounts for CSV", () => {
     expect(formatMoneyPlain(12050)).toBe("120.50");
   });
 
-  it("rounds percentages to the nearest paisa", () => {
+  it("rounds percentages to the nearest piastre", () => {
     expect(percentOf(10000, 10)).toBe(1000);
     expect(percentOf(33333, 10)).toBe(3333);
   });
@@ -197,7 +198,7 @@ describe("membership form validation", () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       expect(parsed.data.months).toBeUndefined();
-      expect(parsed.data.price).toBe(9900); // ₹99 stored as paise
+      expect(parsed.data.price).toBe(9900); // 99.00 EGP stored as piastres
     }
   });
 

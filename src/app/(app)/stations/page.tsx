@@ -6,7 +6,7 @@ import { can, discountCeiling } from "@/lib/permissions";
 import { getOrderableMenu } from "@/server/services/food";
 import { getStationBoard } from "@/server/services/stations";
 
-export const metadata: Metadata = { title: "Stations" };
+export const metadata: Metadata = { title: "Rooms" };
 export const dynamic = "force-dynamic";
 
 export default async function StationsPage() {

@@ -25,11 +25,11 @@ import { formatMoney } from "@/lib/money";
 const AXIS = { stroke: "#71717a", fontSize: 11 };
 const GRID = "#262626";
 
-function shortMoney(paise: number, symbol = "₹") {
-  const rupees = paise / 100;
-  if (rupees >= 100000) return `${symbol}${(rupees / 100000).toFixed(1)}L`;
-  if (rupees >= 1000) return `${symbol}${Math.round(rupees / 1000)}k`;
-  return `${symbol}${Math.round(rupees)}`;
+function shortMoney(minorUnits: number, currencyCode = "EGP") {
+  const amount = minorUnits / 100;
+  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}m ${currencyCode}`;
+  if (amount >= 1000) return `${Math.round(amount / 1000)}k ${currencyCode}`;
+  return `${Math.round(amount)} ${currencyCode}`;
 }
 
 function TooltipBox({

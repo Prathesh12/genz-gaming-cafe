@@ -6,6 +6,7 @@ import { ImageUp, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import mainLogo from "@/app/main_logo.png";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -47,7 +48,7 @@ export function LogoCard({ hasLogo, version }: { hasLogo: boolean; version: stri
   /** Shown the instant a file is picked, so the owner sees the result at once. */
   const [preview, setPreview] = useState<string | null>(null);
 
-  const currentSrc = preview ?? (hasLogo ? `/api/logo${version ? `?v=${version}` : ""}` : null);
+  const currentSrc = preview ?? (hasLogo ? `/api/logo${version ? `?v=${version}` : ""}` : mainLogo.src);
 
   function pick(file: File | undefined) {
     if (!file) return;
@@ -88,12 +89,8 @@ export function LogoCard({ hasLogo, version }: { hasLogo: boolean; version: stri
       </CardHeader>
       <CardContent className="flex flex-wrap items-start gap-5">
         <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-surface-2">
-          {currentSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element -- user-uploaded, served from our own route
-            <img src={currentSrc} alt="Your cafe logo" className="size-full object-contain" />
-          ) : (
-            <span className="text-2xl font-black text-gold">GZ</span>
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element -- may be a user-uploaded data URL */}
+          <img src={currentSrc} alt="Dr. Games logo" className="size-full object-contain" />
         </div>
 
         <div className="min-w-0 flex-1 space-y-3">
@@ -137,7 +134,7 @@ export function LogoCard({ hasLogo, version }: { hasLogo: boolean; version: stri
         destructive
         loading={pending}
         confirmLabel="Remove logo"
-        description="The interface and receipts go back to the plain GZ badge. You can upload a logo again at any time."
+        description="The interface and receipts go back to the bundled Dr. Games main logo. You can upload another logo again at any time."
         onConfirm={() =>
           startTransition(async () => {
             const result = await removeLogoAction();

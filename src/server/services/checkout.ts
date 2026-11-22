@@ -208,6 +208,8 @@ export async function completeCheckout(input: CheckoutInput, user: SessionUser) 
             share: playerShares[index],
           })),
           playerCount: bill.session.playerCount,
+          pricingModel: bill.session.pricingModel,
+          playstationType: bill.station.playstationType,
           pricedAt: now.toISOString(),
           pricedBy: user.name,
           override: overrideApplied

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { Banknote, Download, IndianRupee, Smartphone, SplitSquareHorizontal } from "lucide-react";
+import { Banknote, Coins, Download, Smartphone, SplitSquareHorizontal } from "lucide-react";
 import Link from "next/link";
 
 import { RangePicker } from "@/components/range-picker";
@@ -69,7 +69,7 @@ export default async function IncomePage({
       </p>
 
       <StatGrid>
-        <StatCard label="Total revenue" value={formatMoney(totals.total, symbol)} accent icon={<IndianRupee className="size-4" />} />
+        <StatCard label="Total revenue" value={formatMoney(totals.total, symbol)} accent icon={<Coins className="size-4" />} />
         <StatCard label="Gaming" value={formatMoney(totals.gaming, symbol)} sub={`Avg ${formatDurationHuman(totals.averageMinutes)} per session`} />
         <StatCard label="Food" value={formatMoney(totals.food, symbol)} sub={totals.tax > 0 ? `Tax ${formatMoney(totals.tax, symbol)}` : undefined} />
         <StatCard label="Discounts given" value={formatMoney(totals.discount, symbol)} sub={`Average bill ${formatMoney(totals.averageTicket, symbol)}`} />
@@ -109,7 +109,7 @@ export default async function IncomePage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Station-wise income</CardTitle>
+          <CardTitle>Room-wise income</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {stationRows.length === 0 ? (
@@ -119,7 +119,7 @@ export default async function IncomePage({
               <Table>
                 <THead>
                   <TR>
-                    <TH>Station</TH>
+                    <TH>Room</TH>
                     <TH>Category</TH>
                     <TH className="text-right">Sessions</TH>
                     <TH className="text-right">Played</TH>

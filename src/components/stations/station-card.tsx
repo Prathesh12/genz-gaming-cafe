@@ -11,7 +11,7 @@ import { formatDurationHMS, formatDurationHuman } from "@/lib/time";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
-import { priceSessionForPlayers, type PricingConfig } from "@/server/pricing/engine";
+import { priceRoomSession, priceSessionForPlayers, type PricingConfig } from "@/server/pricing/engine";
 import type { BoardCategory, BoardStation } from "@/server/services/stations";
 
 export type StationCardAction =
@@ -79,22 +79,31 @@ export function StationCard({
     if (!session || !now) return null;
     const startedAt = new Date(session.startedAt);
     try {
-      const result = priceSessionForPlayers({
+      const common = {
         startedAt,
         endedAt: now,
         pauses: session.pauses.map((pause) => ({
           pausedAt: new Date(pause.pausedAt),
           resumedAt: pause.resumedAt ? new Date(pause.resumedAt) : null,
         })),
-        rules: category?.rules ?? [],
         config,
-        players: session.players.map((player) => ({
-          slot: player.slot,
-          label: player.label,
-          customerType: player.customerType,
-          membershipValidUntil: player.membershipValidUntil ? new Date(player.membershipValidUntil) : null,
-        })),
-      });
+      };
+      const result = session.pricingModel === "ROOM"
+        ? priceRoomSession({
+            ...common,
+            rules: session.pricingSnapshot?.rules ?? [],
+            playerCount: session.playerCount,
+          })
+        : priceSessionForPlayers({
+            ...common,
+            rules: category?.rules ?? [],
+            players: session.players.map((player) => ({
+              slot: player.slot,
+              label: player.label,
+              customerType: player.customerType,
+              membershipValidUntil: player.membershipValidUntil ? new Date(player.membershipValidUntil) : null,
+            })),
+          });
       return { amount: result.amount, billedMinutes: result.billedMinutes, error: null as string | null };
     } catch (error) {
       return {
@@ -150,10 +159,10 @@ export function StationCard({
           <div className="min-w-0">
             <p className="truncate text-lg leading-tight font-bold text-ink">{station.code}</p>
             <p className="truncate text-xs text-ink-muted">
-              {station.name} · {station.categoryName}
+              {station.name} · {station.playstationType ?? station.categoryName}
             </p>
           </div>
-          <StationStatusBadge status={session?.status === "PAUSED" ? "OCCUPIED" : station.status} />
+          <StationStatusBadge status={session?.status === "PAUSED" ? "PAUSED" : station.status} />
         </div>
 
         {session ? (
@@ -212,15 +221,13 @@ export function StationCard({
                 <span className="flex min-w-0 items-center gap-1">
                   <Users className="size-3 shrink-0" aria-hidden />
                   <span className="truncate">
-                    {session.playerCount} players ·{" "}
-                    {session.players.filter((player) => player.customerType === "MEMBER").length} on member
-                    rates
+                    {session.playerCount} players
                   </span>
                 </span>
               ) : (
                 <span className="truncate">
                   {session.customerName ?? "Walk-in"}
-                  {session.customerType === "MEMBER" ? " · Member rate" : ""}
+                  {session.pricingModel === "ROOM" ? " · Room rate" : session.customerType === "MEMBER" ? " · Member rate" : ""}
                 </span>
               )}
             </div>
@@ -267,7 +274,7 @@ export function StationCard({
           <>
             <div className="flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
               <Wrench className="mt-0.5 size-4 shrink-0" aria-hidden />
-              <span>{station.maintenanceReason ?? "Under maintenance"}</span>
+              <span>{station.maintenanceReason ?? "Out of service"}</span>
             </div>
             <div className="mt-auto">
               {canManage ? (
@@ -280,7 +287,7 @@ export function StationCard({
                   Return to available
                 </Button>
               ) : (
-                <p className="text-xs text-ink-faint">A manager can return this station to service.</p>
+                <p className="text-xs text-ink-faint">A manager can return this room to service.</p>
               )}
             </div>
           </>
@@ -290,7 +297,7 @@ export function StationCard({
               <span className="tabular text-2xl font-bold text-gold">
                 {station.hourlyRate === null ? "—" : formatMoney(station.hourlyRate, currencySymbol)}
               </span>
-              <span className="text-xs text-ink-muted">{station.maxPlayers > 1 ? "/hr each" : "/hr"}</span>
+              <span className="text-xs text-ink-muted">{station.pricingModel === "ROOM" ? " room price/hour · 1 player" : station.maxPlayers > 1 ? "/hr each" : "/hr"}</span>
               {station.memberHourlyRate !== null && station.memberHourlyRate !== station.hourlyRate ? (
                 <span className="ml-auto text-xs text-ink-faint">
                   Member {formatMoney(station.memberHourlyRate, currencySymbol)}
