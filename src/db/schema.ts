@@ -1,9 +1,9 @@
 /**
- * GENZ GAMING CAFE — database schema (Drizzle ORM / PostgreSQL)
+ * Dr. Games — database schema (Drizzle ORM / PostgreSQL)
  *
  * MONEY
  * Every monetary column is an `integer` holding the amount in **minor units**
- * (paise). ₹120.50 is stored as 12050. This removes floating point drift from
+ * (piastres). 120.50 EGP is stored as 12050. This removes floating point drift from
  * all billing arithmetic. Convert only at the UI boundary via src/lib/money.ts.
  *
  * HISTORY
@@ -40,6 +40,8 @@ export const colorStyleEnum = pgEnum("color_style", ["SOLID", "GRADIENT"]);
  * from the configured durations, which rounds time up to a whole slab.
  */
 export const billingModeEnum = pgEnum("billing_mode", ["PER_MINUTE", "SLAB"]);
+export const pricingModelEnum = pgEnum("pricing_model", ["PER_PLAYER", "ROOM"]);
+export const playstationTypeEnum = pgEnum("playstation_type", ["PS4", "PS5"]);
 export const stationStatusEnum = pgEnum("station_status", [
   "AVAILABLE",
   "OCCUPIED",
@@ -114,6 +116,10 @@ export const stationCategories = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     description: text("description"),
+    /** Null for legacy station categories; required when pricingModel is ROOM. */
+    playstationType: playstationTypeEnum("playstation_type"),
+    /** Legacy categories retain per-player billing until explicitly converted. */
+    pricingModel: pricingModelEnum("pricing_model").notNull().default("PER_PLAYER"),
     color: text("color").notNull().default("#F5C518"),
     /**
      * How many people can share one station of this category. Leave it at 1
@@ -173,7 +179,9 @@ export const pricingRules = pgTable(
     kind: pricingKindEnum("kind").notNull().default("SLAB"),
     /** Slab length in minutes. For DAY_PASS this is the pass validity. */
     durationMinutes: integer("duration_minutes").notNull(),
-    /** Price in minor units (paise). */
+    /** ROOM rules select one total-room price for this many players. */
+    playerCount: integer("player_count").notNull().default(1),
+    /** Price in minor currency units (piastres for EGP). */
     price: integer("price").notNull(),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -186,6 +194,7 @@ export const pricingRules = pgTable(
       t.timeBand,
       t.kind,
       t.durationMinutes,
+      t.playerCount,
     ),
     index("pricing_rules_category_idx").on(t.categoryId, t.isActive),
   ],
@@ -299,6 +308,13 @@ export const gameSessions = pgTable(
      * `session_players`, and each player is charged at their own rate.
      */
     playerCount: integer("player_count").notNull().default(1),
+    /** Billing model agreed at start; legacy sessions remain PER_PLAYER. */
+    pricingModel: pricingModelEnum("pricing_model").notNull().default("PER_PLAYER"),
+    /**
+     * Active-session pricing snapshot. Stage 2 writes the applicable immutable
+     * rule set here; null preserves the legacy lookup path for existing rows.
+     */
+    pricingSnapshot: jsonb("pricing_snapshot"),
     status: sessionStatusEnum("status").notNull().default("ACTIVE"),
     /** Source of truth for the timer. Never store a running counter. */
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
@@ -607,13 +623,13 @@ export const auditLogs = pgTable(
 
 export const businessSettings = pgTable("business_settings", {
   id: integer("id").primaryKey().default(1),
-  cafeName: text("cafe_name").notNull().default("GENZ GAMING CAFE"),
+  cafeName: text("cafe_name").notNull().default("Dr. Games"),
   address: text("address"),
   phone: text("phone"),
   email: text("email"),
   gstNumber: text("gst_number"),
   taxEnabled: boolean("tax_enabled").notNull().default(false),
-  currencySymbol: text("currency_symbol").notNull().default("₹"),
+  currencySymbol: text("currency_symbol").notNull().default("EGP"),
   /** "HH:mm" local times delimiting the night gaming band. */
   nightStart: text("night_start").notNull().default("23:00"),
   nightEnd: text("night_end").notNull().default("06:00"),
@@ -638,7 +654,7 @@ export const businessSettings = pgTable("business_settings", {
   logoData: text("logo_data"),
   logoUpdatedAt: timestamp("logo_updated_at", { withTimezone: true }),
   receiptFooter: text("receipt_footer").notNull().default("Thank you for gaming with us!"),
-  invoicePrefix: text("invoice_prefix").notNull().default("GZ"),
+  invoicePrefix: text("invoice_prefix").notNull().default("DG"),
   invoiceCounter: integer("invoice_counter").notNull().default(0),
   /** IANA timezone used for "today", night bands and reports. */
   timezone: text("timezone").notNull().default("Asia/Kolkata"),

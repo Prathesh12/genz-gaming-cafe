@@ -2,20 +2,18 @@
 
 import { useEffect, useState } from "react";
 
+import mainLogo from "@/app/main_logo.png";
 import { cn } from "@/lib/utils";
 
 /**
  * The cafe logo.
  *
  * Upload it from Settings → Cafe logo and it appears here, on the sign-in
- * screen and on printed receipts. Until then this falls back to the "GZ"
- * badge, so the app never shows a broken image.
- *
- * `public/logo.png` is still honoured for anyone who put a file there before
- * the Settings upload existed.
+ * screen and on printed receipts. Dr. Games' bundled main logo is the default;
+ * an administrator-uploaded Settings logo remains a supported override.
  */
 const UPLOADED_LOGO = "/api/logo";
-const FILE_LOGO = "/logo.png";
+const DEFAULT_LOGO = mainLogo.src;
 
 /**
  * Find a logo to draw, preferring the uploaded one.
@@ -25,16 +23,23 @@ const FILE_LOGO = "/logo.png";
  * the browser's broken-image icon would stay on screen.
  */
 function useLogoSrc(version?: string | null): string | null {
-  const [src, setSrc] = useState<string | null>(null);
+  const [uploadedSrc, setUploadedSrc] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const uploaded = version ? `${UPLOADED_LOGO}?v=${version}` : UPLOADED_LOGO;
+
+    if (!version) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const uploaded = `${UPLOADED_LOGO}?v=${version}`;
 
     function probe(candidate: string, onFail: () => void) {
       const image = new Image();
       image.onload = () => {
-        if (!cancelled) setSrc(candidate);
+        if (!cancelled) setUploadedSrc(candidate);
       };
       image.onerror = () => {
         if (!cancelled) onFail();
@@ -42,14 +47,14 @@ function useLogoSrc(version?: string | null): string | null {
       image.src = candidate;
     }
 
-    probe(uploaded, () => probe(FILE_LOGO, () => setSrc(null)));
+    probe(uploaded, () => setUploadedSrc(DEFAULT_LOGO));
 
     return () => {
       cancelled = true;
     };
   }, [version]);
 
-  return src;
+  return version ? uploadedSrc : DEFAULT_LOGO;
 }
 
 export function BrandMark({
@@ -80,19 +85,7 @@ export function BrandMark({
     );
   }
 
-  return (
-    <span
-      className={cn(
-        "flex shrink-0 items-center justify-center border border-gold/40 bg-gold/10 font-black text-gold",
-        rounded && "rounded-lg",
-        className,
-      )}
-      style={{ width: size, height: size, fontSize: size * 0.42 }}
-      aria-hidden
-    >
-      GZ
-    </span>
-  );
+  return null;
 }
 
 /** Larger lock-up for the sign-in screen: logo above the cafe name. */

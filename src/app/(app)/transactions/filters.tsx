@@ -60,7 +60,7 @@ export function TransactionFilters({
       <NativeSelect
         value={searchParams.get("stationId") ?? "ALL"}
         onChange={(event) => apply({ stationId: event.target.value })}
-        aria-label="Station"
+        aria-label="Room"
       >
         <option value="ALL">All stations</option>
         {stations.map((station) => (

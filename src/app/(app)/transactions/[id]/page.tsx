@@ -44,6 +44,8 @@ type Breakdown = {
     share: number;
   }[];
   playerCount?: number;
+  pricingModel?: "PER_PLAYER" | "ROOM";
+  playstationType?: "PS4" | "PS5" | null;
   override?: { calculated: number; charged: number; reason: string | null; by: string } | null;
 };
 
@@ -109,7 +111,8 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
               minute: "2-digit",
             })}
           />
-          <Row label="Station" value={transaction.stationSnapshot} />
+          <Row label="Room" value={transaction.stationSnapshot} />
+          <Row label="PlayStation" value={breakdown.playstationType ?? transaction.categorySnapshot} />
           <Row
             label={transaction.playerCount > 1 ? "Players" : "Customer"}
             value={
@@ -129,6 +132,14 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
                 : ""
             }`}
           />
+          <Row
+            label="Started"
+            value={new Date(transaction.startedAt).toLocaleTimeString("en-EG", { hour: "2-digit", minute: "2-digit" })}
+          />
+          <Row
+            label="Ended"
+            value={new Date(transaction.endedAt ?? transaction.createdAt).toLocaleTimeString("en-EG", { hour: "2-digit", minute: "2-digit" })}
+          />
           <Row label="Staff" value={staffName} />
         </dl>
 
@@ -138,7 +149,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
           <tbody>
             {breakdown.override ? (
               <tr>
-                <td className="py-0.5 text-ink-muted">Gaming (agreed amount)</td>
+                <td className="py-0.5 text-ink-muted">PlayStation session (agreed amount)</td>
                 <td className="tabular py-0.5 text-right text-ink">
                   {formatMoney(transaction.gamingAmount, symbol)}
                 </td>
@@ -147,8 +158,8 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
             {(breakdown.override ? [] : (breakdown.gaming?.segments ?? [])).map((segment, index) => (
               <tr key={`seg-${index}`}>
                 <td className="py-0.5 text-ink-muted">
-                  Gaming · {segment.timeBand === "NIGHT" ? "Night" : "Normal"}
-                  {transaction.playerCount > 1 || segment.customerType === "MEMBER"
+                  PlayStation · {segment.timeBand === "NIGHT" ? "Night" : "Normal"}
+                  {breakdown.pricingModel !== "ROOM" && (transaction.playerCount > 1 || segment.customerType === "MEMBER")
                     ? ` · ${segment.customerType === "MEMBER" ? "Member" : "Regular"}`
                     : ""}
                   {(segment.players ?? 1) > 1 ? ` × ${segment.players}` : ""} (
@@ -160,12 +171,12 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
             ))}
             {!breakdown.override && (breakdown.gaming?.segments?.length ?? 0) === 0 ? (
               <tr>
-                <td className="py-0.5 text-ink-muted">Gaming</td>
+                <td className="py-0.5 text-ink-muted">PlayStation session</td>
                 <td className="tabular py-0.5 text-right text-ink">{formatMoney(transaction.gamingAmount, symbol)}</td>
               </tr>
             ) : breakdown.override ? null : (
               <tr>
-                <td className="py-0.5 font-semibold text-ink">Gaming total</td>
+                <td className="py-0.5 font-semibold text-ink">PlayStation total</td>
                 <td className="tabular py-0.5 text-right font-semibold text-ink">
                   {formatMoney(transaction.gamingAmount, symbol)}
                 </td>
@@ -175,7 +186,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
             {(breakdown.food ?? []).map((line, index) => (
               <tr key={`food-${index}`}>
                 <td className="py-0.5 text-ink-muted">
-                  {line.name} × {line.quantity}
+                  {line.name} × {line.quantity} @ {formatMoney(line.unitPrice, symbol)}
                 </td>
                 <td className="tabular py-0.5 text-right text-ink">{formatMoney(line.lineTotal, symbol)}</td>
               </tr>

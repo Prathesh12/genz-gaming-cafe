@@ -13,6 +13,7 @@ import {
   uuidSchema,
 } from "@/lib/schemas";
 import {
+  deleteStationCategory,
   deleteStation,
   setStationActive,
   setStationCategoryActive,
@@ -26,6 +27,18 @@ function refreshOperationalViews() {
   revalidatePath("/dashboard");
   revalidatePath("/pricing");
   revalidatePath("/reservations");
+}
+
+/** Permanently remove a room type only when it has no operational or pricing history. */
+export async function deleteStationCategoryAction(id: string): Promise<ActionResult<undefined>> {
+  try {
+    const user = await requirePermission("stations.manage");
+    await deleteStationCategory(parseOrThrow(uuidSchema, id), user);
+    refreshOperationalViews();
+    return actionOk();
+  } catch (error) {
+    return actionError(error);
+  }
 }
 
 export async function saveStationCategoryAction(

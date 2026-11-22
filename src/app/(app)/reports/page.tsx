@@ -63,7 +63,7 @@ export default async function ReportsPage({
         <div className="flex flex-wrap gap-2">
           {[
             { type: "transactions", label: "Transactions" },
-            { type: "stations", label: "Stations" },
+            { type: "stations", label: "Rooms" },
             { type: "food", label: "Food" },
             { type: "sessions", label: "Sessions" },
           ].map((item) => (
@@ -131,7 +131,7 @@ export default async function ReportsPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Station performance</CardTitle>
+          <CardTitle>Room performance</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {stationRows.length === 0 ? (
@@ -141,7 +141,7 @@ export default async function ReportsPage({
               <Table>
                 <THead>
                   <TR>
-                    <TH>Station</TH>
+                    <TH>Room</TH>
                     <TH className="text-right">Sessions</TH>
                     <TH className="text-right">Hours played</TH>
                     <TH className="text-right">Gaming</TH>

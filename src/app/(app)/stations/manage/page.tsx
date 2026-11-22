@@ -5,7 +5,7 @@ import { listCategories, listStations } from "@/server/services/stations";
 
 import { ManageClient } from "./manage-client";
 
-export const metadata: Metadata = { title: "Manage stations" };
+export const metadata: Metadata = { title: "Manage rooms" };
 export const dynamic = "force-dynamic";
 
 export default async function ManageStationsPage() {
@@ -20,6 +20,8 @@ export default async function ManageStationsPage() {
         description: category.description,
         color: category.color,
         maxPlayers: category.maxPlayers,
+        playstationType: category.playstationType,
+        pricingModel: category.pricingModel,
         sortOrder: category.sortOrder,
         isActive: category.isActive,
       }))}

@@ -6,6 +6,7 @@ import { Banknote, Receipt, Smartphone, SplitSquareHorizontal } from "lucide-rea
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogForm, DialogHeader } from "@/components/ui/dialog";
 import { Field, Input, NativeSelect } from "@/components/ui/field";
@@ -184,13 +185,16 @@ export function CheckoutDialog({
             />
 
             <DialogBody className="space-y-4">
+              <div className="flex justify-center">
+                <BrandMark size={56} rounded={false} />
+              </div>
               {/* -------------------------- Summary -------------------------- */}
               <div className="grid grid-cols-2 gap-3 rounded-lg border border-line bg-surface-2 p-3 text-sm sm:grid-cols-4">
                 <Summary
                   label={bill.playerCount > 1 ? "Players" : "Customer"}
-                  value={bill.playerCount > 1 ? `${bill.playerCount} on this station` : (bill.customerName ?? "Walk-in")}
+                  value={bill.playerCount > 1 ? `${bill.playerCount} players` : (bill.customerName ?? "Walk-in")}
                 />
-                <Summary label="Station" value={bill.stationLabel.split(" — ")[0]} />
+                <Summary label="Room" value={bill.stationLabel.split(" — ")[0]} />
                 <Summary label="Played" value={formatDurationHuman(bill.billedMinutes)} />
                 <Summary
                   label="Rate type"

@@ -3,7 +3,7 @@ import {
   CalendarClock,
   ChefHat,
   CreditCard,
-  IndianRupee,
+  DollarSign,
   LayoutDashboard,
   MonitorPlay,
   Settings,
@@ -36,8 +36,8 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/stations",
-    label: "Stations",
-    shortLabel: "Stations",
+    label: "Rooms",
+    shortLabel: "Rooms",
     icon: MonitorPlay,
     permission: "stations.view",
     primary: true,
@@ -60,7 +60,7 @@ export const NAV_ITEMS: NavItem[] = [
     primary: true,
   },
   { href: "/kitchen", label: "Kitchen", shortLabel: "Kitchen", icon: ChefHat, permission: "food.view" },
-  { href: "/income", label: "Income", shortLabel: "Income", icon: IndianRupee, permission: "income.view" },
+  { href: "/income", label: "Income", shortLabel: "Income", icon: DollarSign, permission: "income.view" },
   {
     href: "/transactions",
     label: "Transactions",

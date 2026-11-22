@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import {
   Activity,
   Banknote,
-  IndianRupee,
+  Coins,
   MonitorPlay,
   Smartphone,
   SplitSquareHorizontal,
@@ -46,7 +46,7 @@ export default async function DashboardPage() {
           label="Revenue today"
           value={formatMoney(data.totals.total, symbol)}
           sub={`${data.totals.transactionCount} completed session${data.totals.transactionCount === 1 ? "" : "s"}`}
-          icon={<IndianRupee className="size-4" />}
+          icon={<Coins className="size-4" />}
           accent
         />
         <StatCard
@@ -89,7 +89,7 @@ export default async function DashboardPage() {
       {/* --------------------------- Station overview ------------------------ */}
       <Card>
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Station overview</CardTitle>
+          <CardTitle>Room overview</CardTitle>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/stations">Open the board</Link>
           </Button>

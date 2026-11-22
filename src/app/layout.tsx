@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 
 import { Toaster } from "sonner";
 
+import mainLogo from "./main_logo.png";
 import "./globals.css";
 
 /**
@@ -14,12 +15,17 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "GENZ Gaming Cafe",
-    template: "%s · GENZ Gaming Cafe",
+    default: "Dr. Games",
+    template: "%s · Dr. Games",
   },
   description: "Gaming cafe management and point of sale — stations, sessions, food, payments and income.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "GENZ Cafe", statusBarStyle: "black-translucent" },
+  icons: {
+    icon: [{ url: mainLogo.src, type: "image/png" }],
+    shortcut: [{ url: mainLogo.src, type: "image/png" }],
+    apple: [{ url: mainLogo.src, type: "image/png" }],
+  },
+  appleWebApp: { capable: true, title: "Dr. Games", statusBarStyle: "black-translucent" },
   robots: { index: false, follow: false },
 };
 

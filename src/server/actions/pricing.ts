@@ -58,6 +58,7 @@ export async function copyPricingAction(fromCategoryId: string, toCategoryId: st
           timeBand: rule.timeBand,
           kind: rule.kind,
           durationMinutes: rule.durationMinutes,
+          playerCount: rule.playerCount,
           price: rule.price,
         },
         user,

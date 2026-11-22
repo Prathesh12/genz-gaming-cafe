@@ -76,7 +76,7 @@ export default async function TransactionsPage({
                   <TH>Bill</TH>
                   <TH>Date / time</TH>
                   <TH>Customer</TH>
-                  <TH>Station</TH>
+                  <TH>Room</TH>
                   <TH className="text-right">Played</TH>
                   <TH className="text-right">Gaming</TH>
                   <TH className="text-right">Food</TH>

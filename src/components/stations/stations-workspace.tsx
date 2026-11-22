@@ -29,9 +29,9 @@ type StatusFilter = "ALL" | "AVAILABLE" | "OCCUPIED" | "RESERVED" | "MAINTENANCE
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "ALL", label: "All" },
   { value: "AVAILABLE", label: "Available" },
-  { value: "OCCUPIED", label: "Occupied" },
+  { value: "OCCUPIED", label: "Playing" },
   { value: "RESERVED", label: "Reserved" },
-  { value: "MAINTENANCE", label: "Maintenance" },
+  { value: "MAINTENANCE", label: "Out of service" },
 ];
 
 const ADD_TIME_OPTIONS = [30, 60, 120];
@@ -180,9 +180,9 @@ export function StationsWorkspace({
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search station or customer…"
+              placeholder="Search room or customer…"
               className="pl-9"
-              aria-label="Search stations"
+              aria-label="Search rooms"
             />
           </div>
           {canManage ? (
@@ -252,7 +252,7 @@ export function StationsWorkspace({
       {filtered.length === 0 ? (
         <EmptyState
           icon={<LayoutGrid className="size-6" />}
-          title={board.stations.length === 0 ? "No stations yet" : "Nothing matches those filters"}
+          title={board.stations.length === 0 ? "No rooms yet" : "Nothing matches those filters"}
           description={
             board.stations.length === 0
               ? "Add your PCs, consoles and simulators to start taking sessions."
@@ -261,7 +261,7 @@ export function StationsWorkspace({
           action={
             board.stations.length === 0 && canManage ? (
               <Button asChild>
-                <Link href="/stations/manage">Add your first station</Link>
+                <Link href="/stations/manage">Add your first room</Link>
               </Button>
             ) : null
           }
@@ -372,7 +372,7 @@ export function StationsWorkspace({
       <Dialog open={Boolean(maintenanceStation)} onOpenChange={(open) => !open && setMaintenanceFor(null)}>
         <DialogContent size="sm">
           <DialogHeader
-            title={`${maintenanceStation?.status === "MAINTENANCE" ? "Return to service" : "Mark maintenance"} · ${maintenanceStation?.code ?? ""}`}
+            title={`${maintenanceStation?.status === "MAINTENANCE" ? "Return to service" : "Mark out of service"} · ${maintenanceStation?.code ?? ""}`}
           />
           <DialogBody>
             {maintenanceStation?.status === "MAINTENANCE" ? (
@@ -380,7 +380,7 @@ export function StationsWorkspace({
                 {maintenanceStation.code} will become available for new sessions immediately.
               </p>
             ) : (
-              <Field label="Reason" htmlFor="maintenanceReason" hint="Shown on the station card.">
+              <Field label="Reason" htmlFor="maintenanceReason" hint="Shown on the room card.">
                 <Textarea
                   id="maintenanceReason"
                   value={maintenanceReason}
@@ -439,7 +439,7 @@ export function StationsWorkspace({
                       <span className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
                         {detailsStation.session.playerCount} players
                       </span>
-                      <Button
+                      {detailsStation.session.pricingModel !== "ROOM" ? <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => {
@@ -449,7 +449,7 @@ export function StationsWorkspace({
                       >
                         <Users aria-hidden />
                         Edit players
-                      </Button>
+                      </Button> : <span className="text-xs text-ink-faint">Player count locked</span>}
                     </div>
                     <ul className="divide-y divide-line">
                       {detailsStation.session.players.map((player) => (
@@ -484,7 +484,7 @@ export function StationsWorkspace({
                         value={`${detailsStation.session.memberName} (${detailsStation.session.memberCode})`}
                       />
                     ) : null}
-                    {detailsStation.maxPlayers > 1 ? (
+                    {detailsStation.maxPlayers > 1 && detailsStation.session.pricingModel !== "ROOM" ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -544,7 +544,7 @@ export function StationsWorkspace({
                 ) : null}
               </>
             ) : (
-              <p className="text-ink-muted">This station has no live session.</p>
+              <p className="text-ink-muted">This room has no live session.</p>
             )}
           </DialogBody>
           <DialogFooter>

@@ -87,7 +87,7 @@ export function SettingsForm({ values }: { values: SettingsValues }) {
             htmlFor="billingMode"
             required
             className="sm:col-span-2"
-            hint="By the minute charges only for the time actually played: an hour and a quarter on a ₹100/hr station costs ₹125. Duration deals charges the cheapest combination of the durations you set in Pricing, which rounds the time up to a whole slab."
+            hint="By the minute charges only for the time actually played: an hour and a quarter on a 100.00 EGP/hr station costs 125.00 EGP. Duration deals charges the cheapest combination of the durations you set in Pricing, which rounds the time up to a whole slab."
           >
             <NativeSelect id="billingMode" name="billingMode" defaultValue={values.billingMode}>
               <option value="PER_MINUTE">By the minute — pay for the time played</option>
@@ -110,11 +110,11 @@ export function SettingsForm({ values }: { values: SettingsValues }) {
             label="Timezone"
             htmlFor="timezone"
             required
-            hint="IANA name, e.g. Asia/Kolkata. Used for today, reports and night bands."
+            hint="IANA name, e.g. Africa/Cairo. Used for today, reports and night bands."
           >
             <Input id="timezone" name="timezone" defaultValue={values.timezone} required />
           </Field>
-          <Field label="Currency symbol" htmlFor="currencySymbol" required>
+          <Field label="Currency code" htmlFor="currencySymbol" required>
             <Input id="currencySymbol" name="currencySymbol" defaultValue={values.currencySymbol} maxLength={3} required />
           </Field>
           <Field

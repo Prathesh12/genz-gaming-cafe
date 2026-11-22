@@ -28,7 +28,7 @@ export const hhmmSchema = z
   .trim()
   .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Enter a time as HH:mm (24 hour).");
 
-/** Rupees typed by a human -> paise. Rejects more than two decimal places. */
+/** EGP typed by a human -> piastres. Rejects more than two decimal places. */
 export const rupeesSchema = z
   .coerce.number({ error: "Enter a valid amount." })
   .min(0, "Amount cannot be negative.")
@@ -98,6 +98,8 @@ export const stationCategorySchema = z.object({
   name: z.string().trim().min(2, "Category name is required.").max(50),
   description: optionalText(200),
   color: hexColorSchema.default("#F5C518"),
+  playstationType: z.preprocess(emptyToNull, z.enum(["PS4", "PS5"]).nullable().default(null)),
+  pricingModel: z.enum(["PER_PLAYER", "ROOM"]).default("PER_PLAYER"),
   /**
    * Seats per station. Leave it at 1 for a single-player PC; set 4 for PS5
    * multiplayer so the counter can record each player and charge them their
@@ -113,6 +115,9 @@ export const stationCategorySchema = z.object({
       .default(1),
   ),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
+}).refine((value) => value.pricingModel !== "ROOM" || (value.playstationType && value.maxPlayers <= 4), {
+  message: "A PlayStation room category requires PS4 or PS5 and supports at most 4 players.",
+  path: ["playstationType"],
 });
 
 export const stationSchema = z.object({
@@ -149,7 +154,11 @@ export const pricingRuleSchema = z.object({
   timeBand: z.enum(["NORMAL", "NIGHT"]),
   kind: z.enum(["SLAB", "DAY_PASS"]).default("SLAB"),
   durationMinutes: minutesSchema,
+  playerCount: z.coerce.number().int().min(1).max(4).default(1),
   price: rupeesSchema,
+}).refine((value) => value.price > 0, {
+  message: "Price must be greater than zero.",
+  path: ["price"],
 });
 
 /* -------------------------------------------------------------------------- */
@@ -366,7 +375,7 @@ export const settingsSchema = z.object({
   email: z.preprocess(emptyToNull, z.email("Enter a valid email.").nullable().default(null)),
   gstNumber: optionalText(20),
   taxEnabled: checkboxSchema.default(false),
-  currencySymbol: z.string().trim().min(1).max(3).default("₹"),
+  currencySymbol: z.string().trim().min(1).max(3).default("EGP"),
   nightStart: hhmmSchema,
   nightEnd: hhmmSchema,
   dayPassEnabled: checkboxSchema.default(true),

@@ -41,7 +41,7 @@ export function StartSessionDialog({
 
   useEffect(() => {
     if (state?.ok) {
-      toast.success(`Session started on ${station?.code ?? "station"}`);
+      toast.success(`Session started in ${station?.code ?? "room"}`);
       onOpenChange(false);
       onStarted();
     } else if (state?.ok === false) {
@@ -52,7 +52,8 @@ export function StartSessionDialog({
 
   if (!station) return null;
 
-  const maxPlayers = Math.max(1, station.maxPlayers);
+  const roomPricing = station.pricingModel === "ROOM";
+  const maxPlayers = roomPricing ? 4 : Math.max(1, station.maxPlayers);
   const shared = maxPlayers > 1;
 
   /** Grow or shrink the roster, keeping the members already picked. */
@@ -74,8 +75,9 @@ export function StartSessionDialog({
 
   // What the counter will collect per hour, at the rates showing on the card.
   const memberRate = station.memberHourlyRate ?? station.hourlyRate;
-  const estimate =
-    station.hourlyRate === null
+  const estimate = roomPricing
+    ? (station.roomHourlyRates[seats.length] ?? null)
+    : station.hourlyRate === null
       ? null
       : memberSeats * (memberRate ?? station.hourlyRate) + guestSeats * station.hourlyRate;
 
@@ -108,14 +110,16 @@ export function StartSessionDialog({
             {/* ------------------------- Rate summary ------------------------ */}
             <div className="flex items-center justify-between rounded-lg border border-line bg-surface-2 px-3 py-2.5">
               <span className="text-sm text-ink-muted">
-                {shared
+                {roomPricing
+                  ? `Total room price · ${seats.length} player${seats.length === 1 ? "" : "s"}`
+                  : shared
                   ? `${memberSeats} at member rate · ${guestSeats} at regular rate`
                   : memberSeats > 0
                     ? "Member rate"
                     : "Regular rate"}
               </span>
               <span className="tabular text-lg font-bold text-gold">
-                {estimate === null ? "No pricing" : `${formatMoney(estimate, currencySymbol)}/hr`}
+                {estimate === null ? "No pricing" : `${formatMoney(estimate, currencySymbol)} room price/hour`}
               </span>
             </div>
 
@@ -123,7 +127,7 @@ export function StartSessionDialog({
             {shared ? (
               <Field
                 label="How many are playing?"
-                hint="Each player is charged their own rate — members pay member prices, everyone else pays regular prices."
+                hint={roomPricing ? "The selected total room rate is charged once and locked for this session." : "Each player is charged their own rate."}
               >
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: maxPlayers }, (_, index) => index + 1).map((count) => (
@@ -171,7 +175,7 @@ export function StartSessionDialog({
               ))}
             </div>
 
-            {shared && guestSeats > 0 ? (
+            {!roomPricing && shared && guestSeats > 0 ? (
               <p className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-ink-muted">
                 <Users className="size-4 shrink-0 text-ink-faint" aria-hidden />
                 {guestSeats === 1 ? "One seat is" : `${guestSeats} seats are`} on the regular rate — a
@@ -246,7 +250,7 @@ export function StartSessionDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
               Cancel
             </Button>
-            <Button type="submit" size="lg" loading={pending} disabled={station.hourlyRate === null}>
+            <Button type="submit" size="lg" loading={pending} disabled={estimate === null}>
               {shared && seats.length > 1 ? (
                 <>
                   <UserRound aria-hidden />

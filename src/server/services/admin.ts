@@ -12,6 +12,7 @@ import {
   reservations,
   stationCategories,
   stations,
+  transactions,
   users,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit";
@@ -31,10 +32,27 @@ export async function upsertStationCategory(
     color: string;
     maxPlayers: number;
     sortOrder: number;
+    playstationType: "PS4" | "PS5" | null;
+    pricingModel: "PER_PLAYER" | "ROOM";
   },
   user: SessionUser,
 ) {
   if (input.id) {
+    const [existing] = await db.select().from(stationCategories).where(eq(stationCategories.id, input.id)).limit(1);
+    if (!existing) throw new NotFoundError("Room type not found.");
+    const billingChanged =
+      existing.pricingModel !== input.pricingModel ||
+      existing.playstationType !== input.playstationType ||
+      existing.maxPlayers !== input.maxPlayers;
+    if (billingChanged) {
+      const [live] = await db
+        .select({ id: gameSessions.id })
+        .from(gameSessions)
+        .innerJoin(stations, eq(gameSessions.stationId, stations.id))
+        .where(and(eq(stations.categoryId, input.id), inArray(gameSessions.status, ["ACTIVE", "PAUSED"])))
+        .limit(1);
+      if (live) throw new ConflictError("Finish active sessions before changing this room type or capacity.");
+    }
     const [row] = await db
       .update(stationCategories)
       .set({
@@ -42,6 +60,8 @@ export async function upsertStationCategory(
         description: input.description,
         color: input.color,
         maxPlayers: input.maxPlayers,
+        playstationType: input.playstationType,
+        pricingModel: input.pricingModel,
         sortOrder: input.sortOrder,
         updatedAt: new Date(),
       })
@@ -66,6 +86,8 @@ export async function upsertStationCategory(
       description: input.description,
       color: input.color,
       maxPlayers: input.maxPlayers,
+      playstationType: input.playstationType,
+      pricingModel: input.pricingModel,
       sortOrder: input.sortOrder,
     })
     .returning();
@@ -80,8 +102,15 @@ export async function upsertStationCategory(
   return row;
 }
 
-/** Categories are deactivated, never deleted — history keeps referencing them. */
+/** Deactivation is the normal retirement path and remains reversible. */
 export async function setStationCategoryActive(id: string, isActive: boolean, user: SessionUser) {
+  const [category] = await db
+    .select({ id: stationCategories.id })
+    .from(stationCategories)
+    .where(eq(stationCategories.id, id))
+    .limit(1);
+  if (!category) throw new NotFoundError("Room type not found.");
+
   if (!isActive) {
     const [row] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -93,10 +122,12 @@ export async function setStationCategoryActive(id: string, isActive: boolean, us
       );
     }
   }
-  await db
+  const [updated] = await db
     .update(stationCategories)
     .set({ isActive, updatedAt: new Date() })
-    .where(eq(stationCategories.id, id));
+    .where(eq(stationCategories.id, id))
+    .returning({ id: stationCategories.id });
+  if (!updated) throw new NotFoundError("Room type not found.");
   await recordAudit({
     action: isActive ? "category.updated" : "category.deactivated",
     userId: user.id,
@@ -104,6 +135,70 @@ export async function setStationCategoryActive(id: string, isActive: boolean, us
     entityType: "station_category",
     entityId: id,
     metadata: { isActive },
+  });
+}
+
+/**
+ * Permanently remove an unused room type.
+ *
+ * Historical pricing and operational records deliberately block deletion even
+ * when they are inactive. Nothing is cascaded; administrators should deactivate
+ * the room type when it has ever been used.
+ */
+export async function deleteStationCategory(id: string, user: SessionUser) {
+  return db.transaction(async (tx) => {
+    const [category] = await tx.select().from(stationCategories).where(eq(stationCategories.id, id)).limit(1);
+    if (!category) throw new NotFoundError("Room type not found.");
+
+    const [[roomCount], [pricingCount], [sessionCount], [reservationCount], [transactionCount]] = await Promise.all([
+      tx.select({ count: sql<number>`count(*)::int` }).from(stations).where(eq(stations.categoryId, id)),
+      tx.select({ count: sql<number>`count(*)::int` }).from(pricingRules).where(eq(pricingRules.categoryId, id)),
+      tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(gameSessions)
+        .innerJoin(stations, eq(gameSessions.stationId, stations.id))
+        .where(eq(stations.categoryId, id)),
+      tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(reservations)
+        .innerJoin(stations, eq(reservations.stationId, stations.id))
+        .where(eq(stations.categoryId, id)),
+      tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(transactions)
+        .innerJoin(stations, eq(transactions.stationId, stations.id))
+        .where(eq(stations.categoryId, id)),
+    ]);
+
+    const dependencies = [
+      [roomCount.count, "room"],
+      [pricingCount.count, "pricing rule"],
+      [sessionCount.count, "session"],
+      [reservationCount.count, "reservation"],
+      [transactionCount.count, "transaction"],
+    ] as const;
+    const blockers = dependencies
+      .filter(([count]) => count > 0)
+      .map(([count, label]) => `${count} ${label}${count === 1 ? "" : "s"}`);
+
+    if (blockers.length > 0) {
+      throw new ConflictError(
+        `${category.name} cannot be deleted because it has ${blockers.join(", ")}. Deactivate it instead to preserve history.`,
+      );
+    }
+
+    await tx.delete(stationCategories).where(eq(stationCategories.id, id));
+    await recordAudit(
+      {
+        action: "category.deleted",
+        userId: user.id,
+        userLabel: user.name,
+        entityType: "station_category",
+        entityId: id,
+        metadata: { name: category.name },
+      },
+      tx,
+    );
   });
 }
 
@@ -128,6 +223,16 @@ export async function upsertStation(
   const code = input.code.toUpperCase();
 
   if (input.id) {
+    const [existing] = await db.select().from(stations).where(eq(stations.id, input.id)).limit(1);
+    if (!existing) throw new NotFoundError("Room not found.");
+    if (existing.categoryId !== input.categoryId) {
+      const [live] = await db
+        .select({ id: gameSessions.id })
+        .from(gameSessions)
+        .where(and(eq(gameSessions.stationId, input.id), inArray(gameSessions.status, ["ACTIVE", "PAUSED"])))
+        .limit(1);
+      if (live) throw new ConflictError("Finish the active room session before changing its PlayStation type.");
+    }
     const [row] = await db
       .update(stations)
       .set({
@@ -293,16 +398,35 @@ export async function upsertPricingRule(
     timeBand: "NORMAL" | "NIGHT";
     kind: "SLAB" | "DAY_PASS";
     durationMinutes: number;
+    playerCount: number;
     price: number;
   },
   user: SessionUser,
 ) {
+  if (!Number.isInteger(input.playerCount) || input.playerCount < 1 || input.playerCount > 4) {
+    throw new ConflictError("Player count must be between 1 and 4.");
+  }
+  if (!Number.isFinite(input.price) || input.price <= 0) {
+    throw new ConflictError("Price must be greater than zero.");
+  }
+
+  const [category] = await db
+    .select({ pricingModel: stationCategories.pricingModel })
+    .from(stationCategories)
+    .where(eq(stationCategories.id, input.categoryId))
+    .limit(1);
+  if (!category) throw new NotFoundError("Room category not found.");
+  if (category.pricingModel === "ROOM" && (input.customerType !== "REGULAR" || input.timeBand !== "NORMAL")) {
+    throw new ConflictError("Room pricing uses one regular rate table by player count.");
+  }
+
   const values = {
     categoryId: input.categoryId,
     customerType: input.customerType,
     timeBand: input.timeBand,
     kind: input.kind,
     durationMinutes: input.durationMinutes,
+    playerCount: input.playerCount,
     price: input.price,
     isActive: true,
     updatedAt: new Date(),
@@ -333,6 +457,7 @@ export async function upsertPricingRule(
         pricingRules.timeBand,
         pricingRules.kind,
         pricingRules.durationMinutes,
+        pricingRules.playerCount,
       ],
       set: { price: values.price, isActive: true, updatedAt: new Date() },
     })

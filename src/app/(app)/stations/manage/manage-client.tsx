@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/ui/states";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import type { ActionResult } from "@/lib/errors";
 import {
+  deleteStationCategoryAction,
   deleteStationAction,
   saveStationAction,
   saveStationCategoryAction,
@@ -32,6 +33,8 @@ type Category = {
   maxPlayers: number;
   sortOrder: number;
   isActive: boolean;
+  playstationType: "PS4" | "PS5" | null;
+  pricingModel: "PER_PLAYER" | "ROOM";
 };
 
 /**
@@ -72,6 +75,7 @@ export function ManageClient({ categories, stations }: { categories: Category[];
   const router = useRouter();
   const [categoryDialog, setCategoryDialog] = useState<Category | "new" | null>(null);
   const [stationDialog, setStationDialog] = useState<Station | "new" | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState<Station | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -90,31 +94,31 @@ export function ManageClient({ categories, stations }: { categories: Category[];
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild aria-label="Back to stations">
+        <Button variant="ghost" size="icon" asChild aria-label="Back to rooms">
           <Link href="/stations">
             <ArrowLeft />
           </Link>
         </Button>
         <p className="text-sm text-ink-muted">
-          Categories and stations are fully configurable — nothing here is hard-coded.
+          Room types and rooms are fully configurable. Retire old types by deactivating them so history stays intact.
         </p>
       </div>
 
       {/* ----------------------------- Categories ----------------------------- */}
       <Card>
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Station categories</CardTitle>
+          <CardTitle>Room types</CardTitle>
           <Button size="sm" onClick={() => setCategoryDialog("new")}>
             <Plus aria-hidden />
-            New category
+            New room type
           </Button>
         </CardHeader>
         <CardContent className="p-0">
           {categories.length === 0 ? (
             <EmptyState
               className="m-4 border-0"
-              title="No categories yet"
-              description="Create categories such as Gaming PC, PS5 Multiplayer, F1 Simulator or VR."
+              title="No room types yet"
+              description="Create PS4 Room and PS5 Room types for your PlayStation rooms."
             />
           ) : (
             <TableWrap className="rounded-none border-0">
@@ -124,7 +128,7 @@ export function ManageClient({ categories, stations }: { categories: Category[];
                     <TH>Name</TH>
                     <TH>Colour</TH>
                     <TH>Players</TH>
-                    <TH>Stations</TH>
+                    <TH>Rooms</TH>
                     <TH>Status</TH>
                     <TH className="text-right">Actions</TH>
                   </TR>
@@ -178,6 +182,16 @@ export function ManageClient({ categories, stations }: { categories: Category[];
                             >
                               {category.isActive ? <PowerOff className="text-danger" /> : <RotateCcw />}
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={pending}
+                              onClick={() => setDeletingCategory(category)}
+                              aria-label={`Delete ${category.name}`}
+                              title="Delete permanently if unused"
+                            >
+                              <Trash2 className="text-danger" />
+                            </Button>
                           </div>
                         </TD>
                       </TR>
@@ -190,24 +204,54 @@ export function ManageClient({ categories, stations }: { categories: Category[];
         </CardContent>
       </Card>
 
+      <ConfirmDialog
+        open={Boolean(deletingCategory)}
+        onOpenChange={(open) => !open && setDeletingCategory(null)}
+        title={`Delete ${deletingCategory?.name ?? ""} permanently?`}
+        destructive
+        loading={pending}
+        confirmLabel="Delete room type"
+        description={
+          <span>
+            Permanent deletion is allowed only when this room type has no rooms, pricing rules, sessions,
+            reservations, transactions, or other history. Nothing will be cascade-deleted. If it has ever been used,
+            close this dialog and choose <strong>Deactivate</strong> instead.
+          </span>
+        }
+        onConfirm={() => {
+          if (!deletingCategory) return;
+          startTransition(async () => {
+            const category = deletingCategory;
+            const result = await deleteStationCategoryAction(category.id);
+            if (result.ok) {
+              toast.success(`${category.name} deleted`);
+              setDeletingCategory(null);
+              router.refresh();
+            } else {
+              toast.error(result.error);
+            }
+          });
+        }}
+      />
+
       {/* ------------------------------ Stations ------------------------------ */}
       <Card>
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Stations</CardTitle>
+          <CardTitle>Rooms</CardTitle>
           <Button size="sm" onClick={() => setStationDialog("new")} disabled={categories.length === 0}>
             <Plus aria-hidden />
-            New station
+            New room
           </Button>
         </CardHeader>
         <CardContent className="p-0">
           {stations.length === 0 ? (
             <EmptyState
               className="m-4 border-0"
-              title="No stations yet"
+              title="No rooms yet"
               description={
                 categories.length === 0
-                  ? "Create a category first, then add your PCs and consoles."
-                  : "Add PC-01, PS5-01, F1-01 and the rest of your floor."
+                  ? "Create a PS4 Room or PS5 Room type first."
+                  : "Add Room 01, Room 02 and the rest of your floor."
               }
             />
           ) : (
@@ -257,7 +301,7 @@ export function ManageClient({ categories, stations }: { categories: Category[];
                             onClick={() =>
                               toggle(
                                 () => toggleStationActiveAction(station.id, !station.isActive),
-                                station.isActive ? "Station deactivated" : "Station reactivated",
+                                station.isActive ? "Room deactivated" : "Room reactivated",
                               )
                             }
                             aria-label={station.isActive ? `Deactivate ${station.code}` : `Reactivate ${station.code}`}
@@ -292,10 +336,10 @@ export function ManageClient({ categories, stations }: { categories: Category[];
         title={`Delete ${deleting?.code ?? ""} permanently?`}
         destructive
         loading={pending}
-        confirmLabel="Delete station"
+        confirmLabel="Delete room"
         description={
           <span>
-            This removes the station completely. It only works if the station has never hosted a session — once it
+            This removes the room completely. It only works if the room has never hosted a session — once it
             has, its bills must stay linked to it, so use <strong>Deactivate</strong> instead. Deactivated stations
             disappear from the board but keep your income history intact.
           </span>
@@ -375,6 +419,18 @@ function CategoryDialog({
             <Field label="Description" htmlFor="cat-desc">
               <Textarea id="cat-desc" name="description" defaultValue={editing?.description ?? ""} />
             </Field>
+            <Field label="Pricing model" htmlFor="cat-pricing-model">
+              <NativeSelect id="cat-pricing-model" name="pricingModel" defaultValue={editing?.pricingModel ?? "ROOM"}>
+                <option value="ROOM">Total room price</option>
+                <option value="PER_PLAYER">Legacy per-player price</option>
+              </NativeSelect>
+            </Field>
+            <Field label="PlayStation type" htmlFor="cat-playstation-type">
+              <NativeSelect id="cat-playstation-type" name="playstationType" defaultValue={editing?.playstationType ?? "PS4"}>
+                <option value="PS4">PS4</option>
+                <option value="PS5">PS5</option>
+              </NativeSelect>
+            </Field>
             <Field label="Colour" hint="Used for the category chip on the board.">
               <ColorField value={color} onChange={setColor} />
             </Field>
@@ -390,7 +446,7 @@ function CategoryDialog({
                 type="number"
                 defaultValue={editing?.maxPlayers ?? 1}
                 min={1}
-                max={12}
+                max={editing?.pricingModel === "PER_PLAYER" ? 12 : 4}
               />
             </Field>
             <Field label="Sort order" htmlFor="cat-sort" hint="Lower numbers appear first.">
@@ -442,7 +498,7 @@ function StationDialog({
   return (
     <Dialog open={Boolean(value)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent size="md">
-        <DialogHeader title={editing ? `Edit ${editing.code}` : "New station"} />
+        <DialogHeader title={editing ? `Edit ${editing.name}` : "New room"} />
         <DialogForm action={formAction} key={editing?.id ?? "new"}>
           {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
           <input type="hidden" name="color" value={color} />
@@ -457,18 +513,18 @@ function StationDialog({
                 hint="Short and unique, e.g. PC-01"
                 error={state?.ok === false ? state.fieldErrors?.code : undefined}
               >
-                <Input id="station-code" name="code" defaultValue={editing?.code} placeholder="PC-01" required />
+                <Input id="station-code" name="code" defaultValue={editing?.code} placeholder="ROOM-01" required />
               </Field>
               <Field label="Display name" htmlFor="station-name" required>
-                <Input id="station-name" name="name" defaultValue={editing?.name} placeholder="Gaming PC 1" required />
+                <Input id="station-name" name="name" defaultValue={editing?.name} placeholder="Room 01" required />
               </Field>
             </div>
-            <Field label="Category" htmlFor="station-category" required>
+            <Field label="PlayStation type" htmlFor="station-category" required>
               <NativeSelect id="station-category" name="categoryId" defaultValue={editing?.categoryId} required>
                 <option value="">Choose a category…</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
-                    {category.name}
+                    {category.playstationType ? `${category.playstationType} · ${category.name}` : category.name}
                   </option>
                 ))}
               </NativeSelect>
@@ -552,7 +608,7 @@ function StationDialog({
                 id="station-desc"
                 name="description"
                 defaultValue={editing?.description ?? ""}
-                placeholder="RTX 4060 · 27″ 165Hz"
+                placeholder="TV, controllers or room notes"
               />
             </Field>
             <Field label="Sort order" htmlFor="station-sort" hint="Controls the order on the board.">
@@ -564,7 +620,7 @@ function StationDialog({
               Cancel
             </Button>
             <Button type="submit" loading={pending}>
-              Save station
+              Save room
             </Button>
           </DialogFooter>
         </DialogForm>

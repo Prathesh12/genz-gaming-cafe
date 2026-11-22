@@ -19,7 +19,13 @@ import { cn } from "@/lib/utils";
 import { copyPricingAction, deletePricingRuleAction, savePricingRuleAction } from "@/server/actions/pricing";
 import type { PricingRuleRow } from "@/server/services/pricing";
 
-type Category = { id: string; name: string; color: string };
+type Category = {
+  id: string;
+  name: string;
+  color: string;
+  pricingModel: "PER_PLAYER" | "ROOM";
+  playstationType: "PS4" | "PS5" | null;
+};
 
 const PANELS = [
   { customerType: "REGULAR", timeBand: "NORMAL", title: "Regular · Normal hours", icon: Sun },
@@ -54,14 +60,16 @@ export function PricingClient({
   const [pending, startTransition] = useTransition();
 
   const active = rules.filter((rule) => rule.isActive && rule.categoryId === categoryId);
+  const selectedCategory = categories.find((category) => category.id === categoryId);
+  const isRoom = selectedCategory?.pricingModel === "ROOM";
 
   const dayPasses = active.filter((rule) => rule.kind === "DAY_PASS");
 
   if (categories.length === 0) {
     return (
       <EmptyState
-        title="Create a station category first"
-        description="Pricing is configured per station category, so add categories such as Gaming PC or PS5 before setting rates."
+        title="Create a room category first"
+        description="Pricing is configured per room category, so add PS4 and PS5 categories before setting rates."
       />
     );
   }
@@ -134,7 +142,7 @@ export function PricingClient({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {PANELS.map((panel) => {
+        {PANELS.filter((panel) => !isRoom || (panel.customerType === "REGULAR" && panel.timeBand === "NORMAL")).map((panel) => {
           const slabs = active
             .filter(
               (rule) =>
@@ -148,7 +156,7 @@ export function PricingClient({
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Icon className="size-4 text-gold" aria-hidden />
-                  {panel.title}
+                  {isRoom ? "Total room prices" : panel.title}
                 </CardTitle>
                 {canManage ? (
                   <Button
@@ -174,6 +182,11 @@ export function PricingClient({
                     {slabs.map((rule) => (
                       <li key={rule.id} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
                         <span className="w-24 font-medium text-ink">{formatDurationHuman(rule.durationMinutes)}</span>
+                        {isRoom ? (
+                          <Badge tone="neutral">
+                            {rule.playerCount} player{rule.playerCount === 1 ? "" : "s"}
+                          </Badge>
+                        ) : null}
                         <span className="tabular flex-1 text-lg font-bold text-gold">
                           {formatMoney(rule.price, currencySymbol)}
                         </span>
@@ -264,6 +277,7 @@ export function PricingClient({
         categoryId={categoryId}
         currencySymbol={currencySymbol}
         dayPassMinutes={dayPassMinutes}
+        isRoom={isRoom}
         onClose={() => {
           setEditing(null);
           setPresetPanel(null);
@@ -307,6 +321,7 @@ function RuleDialog({
   categoryId,
   currencySymbol,
   dayPassMinutes,
+  isRoom,
   onClose,
   onSaved,
 }: {
@@ -315,6 +330,7 @@ function RuleDialog({
   categoryId: string;
   currencySymbol: string;
   dayPassMinutes: number;
+  isRoom: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -327,6 +343,7 @@ function RuleDialog({
       customerType: editing?.customerType ?? preset?.customerType ?? "REGULAR",
       timeBand: editing?.timeBand ?? preset?.timeBand ?? "NORMAL",
       durationMinutes: editing?.durationMinutes ?? (kind === "DAY_PASS" ? dayPassMinutes : 60),
+      playerCount: editing?.playerCount ?? 1,
       price: editing ? toMajor(editing.price) : "",
     }),
     [editing, preset, kind, dayPassMinutes],
@@ -351,8 +368,14 @@ function RuleDialog({
           {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
           <input type="hidden" name="categoryId" value={editing?.categoryId ?? categoryId} />
           <input type="hidden" name="kind" value={kind} />
+          {isRoom ? (
+            <>
+              <input type="hidden" name="customerType" value="REGULAR" />
+              <input type="hidden" name="timeBand" value="NORMAL" />
+            </>
+          ) : null}
           <DialogBody className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            {!isRoom ? <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Customer type" htmlFor="customerType">
                 <NativeSelect id="customerType" name="customerType" defaultValue={defaults.customerType}>
                   <option value="REGULAR">Regular</option>
@@ -370,9 +393,35 @@ function RuleDialog({
                   <option value="NIGHT">Night</option>
                 </NativeSelect>
               </Field>
-            </div>
+            </div> : null}
 
-            <Field
+            {isRoom && editing ? (
+              <>
+                <input type="hidden" name="playerCount" value={editing.playerCount} />
+                <div className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink-muted">
+                  Total room rate for <span className="font-semibold text-ink">{editing.playerCount} player{editing.playerCount === 1 ? "" : "s"}</span>
+                </div>
+              </>
+            ) : isRoom ? (
+              <Field label="Players" htmlFor="playerCount" required hint="This is the total price for the room.">
+                <NativeSelect id="playerCount" name="playerCount" defaultValue={defaults.playerCount}>
+                  {[1, 2, 3, 4].map((count) => (
+                    <option key={count} value={count}>{count}</option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            ) : (
+              <input type="hidden" name="playerCount" value={editing?.playerCount ?? 1} />
+            )}
+
+            {isRoom && editing ? (
+              <>
+                <input type="hidden" name="durationMinutes" value={editing.durationMinutes} />
+                <div className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink-muted">
+                  Billing slab: <span className="font-semibold text-ink">{formatDurationHuman(editing.durationMinutes)}</span>
+                </div>
+              </>
+            ) : <Field
               label={kind === "DAY_PASS" ? "Validity (minutes)" : "Duration (minutes)"}
               htmlFor="durationMinutes"
               required
@@ -391,7 +440,7 @@ function RuleDialog({
                 defaultValue={defaults.durationMinutes}
                 required
               />
-            </Field>
+            </Field>}
 
             <Field
               label={`Price (${currencySymbol})`}
@@ -404,7 +453,7 @@ function RuleDialog({
                 name="price"
                 type="number"
                 step="0.01"
-                min={0}
+                min={0.01}
                 defaultValue={defaults.price}
                 placeholder="100"
                 required

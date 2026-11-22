@@ -19,16 +19,32 @@ import type { PricingConfig } from "@/server/pricing/engine";
  */
 export const getSettings = cache(async (): Promise<BusinessSettings> => {
   const [row] = await db.select().from(businessSettings).where(eq(businessSettings.id, 1)).limit(1);
-  if (row) return row;
+  if (row) return applyPhaseOneDefaults(row);
   const [created] = await db.insert(businessSettings).values({ id: 1 }).returning();
-  return created;
+  return applyPhaseOneDefaults(created);
 });
 
 export async function getSettingsFor(client: DbClient): Promise<BusinessSettings> {
   const [row] = await client.select().from(businessSettings).where(eq(businessSettings.id, 1)).limit(1);
-  if (row) return row;
+  if (row) return applyPhaseOneDefaults(row);
   const [created] = await client.insert(businessSettings).values({ id: 1 }).returning();
-  return created;
+  return applyPhaseOneDefaults(created);
+}
+
+/**
+ * Existing installations may still contain the application's original built-in
+ * defaults. Present only those legacy values as the Phase 1 defaults without
+ * migrating or rewriting the settings row. Owner-entered values are untouched.
+ */
+function applyPhaseOneDefaults(settings: BusinessSettings): BusinessSettings {
+  return {
+    ...settings,
+    cafeName: settings.cafeName.trim().toUpperCase() === "GENZ GAMING CAFE" ? "Dr. Games" : settings.cafeName,
+    currencySymbol: ["₹", "INR"].includes(settings.currencySymbol.trim().toUpperCase())
+      ? "EGP"
+      : settings.currencySymbol,
+    invoicePrefix: settings.invoicePrefix.trim().toUpperCase() === "GZ" ? "DG" : settings.invoicePrefix,
+  };
 }
 
 /**
@@ -113,5 +129,6 @@ export async function nextInvoiceCode(client: DbClient, when: Date): Promise<str
     .returning({ counter: businessSettings.invoiceCounter, prefix: businessSettings.invoicePrefix });
 
   const year = when.getUTCFullYear();
-  return `${row.prefix}-${year}-${String(row.counter).padStart(6, "0")}`;
+  const prefix = row.prefix.trim().toUpperCase() === "GZ" ? "DG" : row.prefix;
+  return `${prefix}-${year}-${String(row.counter).padStart(6, "0")}`;
 }

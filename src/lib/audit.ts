@@ -15,6 +15,7 @@ export type AuditAction =
   | "category.created"
   | "category.updated"
   | "category.deactivated"
+  | "category.deleted"
   | "pricing.created"
   | "pricing.updated"
   | "pricing.deleted"
